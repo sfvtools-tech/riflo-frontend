@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#ECECEC" />
+    <script>
+      (() => {
+        let preference = "system";
+        try {
+          const stored = localStorage.getItem("riflo:appearance");
+          if (["system", "light", "dark"].includes(stored)) preference = stored;
+        } catch {}
+        const theme = preference === "system" ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : preference;
+        document.documentElement.dataset.appearance = preference;
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+        document.documentElement.style.backgroundColor = theme === "dark" ? "#161616" : "#ECECEC";
+        document.querySelector('meta[name="theme-color"]').content = theme === "dark" ? "#161616" : "#ECECEC";
+      })();
+    </script>
+    <meta
+      name="description"
+      content="Give your recordings a second life. Riflo turns video into content for your next conversation."
+    />
+    <title>Riflo — Give your ideas room</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

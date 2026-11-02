@@ -1,0 +1,68 @@
+/* Preserve the legacy cascade; source-owned controls live in utilities above it. */
+@layer theme, legacy, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "./app.css" layer(legacy);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+@source "../components/ui";
+@source "../app/App.tsx";
+@source "../features/brand";
+@source "../features/signin";
+@source "../features/account/UsagePage.tsx";
+@source "../features/projects/DriveConnection.tsx";
+@source "../features/projects/ProjectLibrary.tsx";
+@source "../features/projects/ImportVideo.tsx";
+@source "../features/projects/Projects.tsx";
+@source "../features/projects/LiveProjects.tsx";
+@source "../features/projects/LiveProjectDetail.tsx";
+@source "../features/projects/DeleteProject.tsx";
+@source "../features/projects/ProjectSettings.tsx";
+@source "../features/projects/GenerationPanel.tsx";
+@source "../features/projects/ImportRetry.tsx";
+@source "../features/projects/OutputReader.tsx";
+@source "../features/projects/CreateContentChooser.tsx";
+@source "../features/projects/PreviewResults.tsx";
+
+@source "../shared/ui/Settings.tsx";
+@source "../shared/ui/Appearance.tsx";
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Existing Kingfisher semantics remain authoritative. Never redefine --muted,
+   --accent or --radius: their legacy meanings differ from shadcn's defaults. */
+:root {
+  --ui-background: var(--surface);
+  --ui-foreground: var(--ink);
+  --ui-muted: var(--subtle);
+  --ui-muted-foreground: var(--muted);
+  --ui-accent: var(--selected);
+  --ui-accent-foreground: var(--on-selected);
+  --ui-radius: 8px;
+}
+@theme inline {
+  --color-background: var(--ui-background);
+  --color-foreground: var(--ui-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--on-primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-pressed: var(--primary-pressed);
+  --color-secondary: var(--rail-selected);
+  --color-secondary-foreground: var(--ink);
+  --color-muted: var(--ui-muted);
+  --color-muted-foreground: var(--ui-muted-foreground);
+  --color-accent: var(--ui-accent);
+  --color-accent-foreground: var(--ui-accent-foreground);
+  --color-destructive: var(--error);
+  --color-destructive-fill: var(--destructive);
+  --color-destructive-hover: var(--destructive-hover);
+  --color-destructive-pressed: var(--destructive-pressed);
+  --color-destructive-foreground: var(--on-destructive);
+  --color-destructive-subtle: var(--error-surface);
+  --color-destructive-subtle-hover: var(--error-surface-hover);
+  --color-border: var(--border);
+  --color-input: var(--control-border);
+  --color-ring: var(--primary);
+  --radius-md: var(--ui-radius);
+  --font-sans: var(--body);
+}
+
+@source "../features/projects/GenerationControls.tsx";
+@source "../features/account/GenerationDefaults.tsx";

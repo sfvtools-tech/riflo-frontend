@@ -1,0 +1,19 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+.DS_Store
+artifacts/
+
+# Local deployment cache and generated review evidence.
+.firebase/
+*.log
+coverage/
+/docs/*-20??-??-??.*
+
+# Local credentials.
+*service-account*.json
+*credentials*.json
+*.pem
+*.key
