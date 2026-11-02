@@ -1,0 +1,118 @@
+name: Frontend CI and deploy
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Frontend checks
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    env:
+      VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+      VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
+      VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+      VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+      VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.22.2'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Validate production build configuration
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          node --input-type=module <<'NODE'
+          const names = ['VITE_FIREBASE_API_KEY', 'VITE_FIREBASE_AUTH_DOMAIN', 'VITE_FIREBASE_PROJECT_ID', 'VITE_FIREBASE_APP_ID', 'VITE_API_BASE_URL'];
+          for (const name of names) {
+            if (!process.env[name]?.trim()) throw new Error(`Missing repository variable: ${name}`);
+          }
+          if (process.env.VITE_FIREBASE_PROJECT_ID !== 'riflo-159b5') throw new Error('Unexpected Firebase project');
+          if (process.env.VITE_FIREBASE_AUTH_DOMAIN !== 'riflo-159b5.firebaseapp.com') throw new Error('Unexpected Firebase auth domain');
+          if (process.env.VITE_API_BASE_URL !== 'https://34.93.118.95') throw new Error('Unexpected API base URL');
+          NODE
+      # Includes TypeScript checking. PR builds also work without public config.
+      - run: npm run build
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          name: frontend-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  deploy:
+    name: Deploy Firebase Hosting
+    needs: checks
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: frontend-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.22.2'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: frontend-${{ github.sha }}
+          path: dist/
+      - name: Install pinned Firebase CLI
+        run: npm install --global firebase-tools@15.34.2
+      - name: Reject a superseded main revision
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          latest=$(git ls-remote "https://github.com/$REPOSITORY.git" refs/heads/main | cut -f1)
+          test "$latest" = "$GITHUB_SHA" || { echo 'Main has advanced; deploy the newer run instead.' >&2; exit 1; }
+      - name: Authenticate for deployment
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          project_id: riflo-159b5
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - name: Deploy tested build
+        run: firebase deploy --only hosting --project riflo-159b5 --non-interactive
+      - name: Verify live page and JavaScript asset
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFile } from 'node:fs/promises';
+          import { setTimeout } from 'node:timers/promises';
+          const origin = 'https://riflo-159b5.web.app';
+          const index = await readFile('dist/index.html', 'utf8');
+          const asset = index.match(/src="(\/assets\/[^"/]+\.js)"/)?.[1];
+          assert.ok(asset, 'Build must reference a JavaScript asset');
+          for (let attempt = 1; ; attempt++) {
+            try {
+              for (const [path, expected] of [['/', Buffer.from(index)], [asset, await readFile(`dist${asset}`)]]) {
+                const response = await fetch(`${origin}${path}`, { signal: AbortSignal.timeout(15000), cache: 'no-store' });
+                assert.equal(response.status, 200, `${path} status`);
+                assert.deepEqual(Buffer.from(await response.arrayBuffer()), expected, `${path} must match this release`);
+              }
+              break;
+            } catch (error) {
+              if (attempt === 5) throw error;
+              await setTimeout(5000);
+            }
+          }
+          console.log('Live page and JavaScript match the tested build.');
+          NODE

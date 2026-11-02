@@ -17,3 +17,4 @@ coverage/
 *credentials*.json
 *.pem
 *.key
+gha-creds-*.json
